@@ -1,3 +1,5 @@
+using TripSQLClient.Services;
+
 namespace TripSQLClient;
 
 public class Program
@@ -8,6 +10,7 @@ public class Program
         
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
+        builder.Services.AddTransient<IDbService, DbService>();
 
         var app = builder.Build();
 
