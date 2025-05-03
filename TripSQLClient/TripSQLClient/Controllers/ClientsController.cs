@@ -49,6 +49,11 @@ public class ClientsController(IDbService dbService): ControllerBase
         {
             return BadRequest(e.Message); // Jeśli przekroczono maksymalną liczbę uczestników
         }
+        
+        catch (AlreadyExistsException e)
+        {
+            return BadRequest(e.Message); // Jeśli klient juz ma zarejestrowana wycieczke
+        }
     }
     
     // Endpoint usuwający zapis klienta na wycieczkę

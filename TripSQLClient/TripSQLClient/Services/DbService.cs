@@ -181,6 +181,22 @@ public class DbService(IConfiguration config) : IDbService
 
         return result != null;  //zwracamy wartosc logiczna ktora informuje o nieprzekroczeniu limitu osob (true), lub przekroczeniu (false)
     }
+    
+    private async Task<bool> IsClientAlreadyRegisteredForTripAsync(int idClient, int idTrip)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        //Zapytanie SQL ktore sprawdza czy klient juz posiada dana wycieczke
+        const string sql = "SELECT 1 FROM Client_Trip WHERE IdClient = @IdClient AND IdTrip = @IdTrip";
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@IdClient", idClient);
+        command.Parameters.AddWithValue("@IdTrip", idTrip);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+
+        return result != null; //zwracamy wartosc logiczna ktora informuje czy klient jest zarejestrowany na wycieczke (true), lub nie (false)
+    }
 
     public async Task<ClientTrip> CreateClientTripByIdAsync(int idClient, int idTrip)
     {
@@ -189,10 +205,13 @@ public class DbService(IConfiguration config) : IDbService
 
         if (!await TripExistsAsync(idTrip))
             throw new NotFoundException($"Trip with id: {idTrip} does not exist");
+        
+        if (await IsClientAlreadyRegisteredForTripAsync(idClient, idTrip))
+            throw new AlreadyExistsException($"Client with id: {idClient} is already registered for trip: {idTrip}");
 
         if (!await CheckTripLimitAsync(idTrip))
             throw new MaxCapacityReachedException($"Trip: {idTrip} has reached maximum capacity");
-
+        
         await using var connection = new SqlConnection(_connectionString);
         // Zapytanie SQL do zapisania klienta na wycieczkę
         const string sql = @"
