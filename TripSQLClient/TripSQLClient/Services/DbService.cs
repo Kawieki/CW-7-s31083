@@ -166,12 +166,13 @@ public class DbService(IConfiguration config) : IDbService
         await using var connection = new SqlConnection(_connectionString);
         
         //Zapytanie SQL ktore sprawdza czy na dana wycieczke jest możlwiość przypisana klienta (czy limit osób nie bedzie przekroczony)
-        const string sql = @"SELECT COUNT(ct.IdTrip) 
-                             FROM Client_Trip ct 
-                             INNER JOIN Trip t ON ct.IdTrip = t.IdTrip
-                             WHERE t.IdTrip = @id
-                             GROUP BY t.MaxPeople
-                             HAVING COUNT(ct.IdTrip) < t.MaxPeople";
+        const string sql = @"SELECT 1
+                            FROM Trip t
+                            LEFT JOIN Client_Trip ct ON t.IdTrip = ct.IdTrip
+                            WHERE t.IdTrip = @id
+                            GROUP BY t.MaxPeople
+                            HAVING COUNT(ct.IdClient) < t.MaxPeople
+                           ";
 
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@id", id);
