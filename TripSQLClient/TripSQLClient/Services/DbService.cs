@@ -11,7 +11,8 @@ public interface IDbService
     public Task<IEnumerable<CountryTripGetDTO>> GetTripsDetailsAsync();
     public Task<IEnumerable<ClientTripDTO>> GetClientTripsDetailsByIdAsync(int id);
     public Task<Client> CreateClientAsync(ClientCreateDTO client);
-    
+    public Task<ClientTrip> CreateClientTripByIdAsync(int idClient, int tripId);
+    public Task RemoveClientTripByIdAsync(int id, int tripId);
 }
 
 public class DbService(IConfiguration config) : IDbService
@@ -77,7 +78,7 @@ public class DbService(IConfiguration config) : IDbService
         command.Parameters.AddWithValue("@id", id);
         await connection.OpenAsync();
         await using var reader = await command.ExecuteReaderAsync();
-
+        
         if (!reader.HasRows)
         {
             throw new NotFoundException($"Client with id: {id} does not exist or does not have trips");
@@ -126,5 +127,100 @@ public class DbService(IConfiguration config) : IDbService
         };
     }
     
-    
+    private async Task<bool> ClientExistsAsync(int id)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        const string sql = "SELECT 1 FROM Client WHERE IdClient = @id";
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@id", id);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+
+        return result != null;
+    }
+
+    private async Task<bool> TripExistsAsync(int id)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        const string sql = "SELECT 1 FROM Trip WHERE IdTrip = @id";
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@id", id);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+
+        return result != null;
+    }
+
+    private async Task<bool> CheckTripLimitAsync(int id)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        const string sql = @"SELECT COUNT(ct.IdTrip) 
+                             FROM Client_Trip ct 
+                             INNER JOIN Trip t ON ct.IdTrip = t.IdTrip
+                             WHERE t.IdTrip = @id
+                             GROUP BY t.MaxPeople
+                             HAVING COUNT(ct.IdTrip) < t.MaxPeople";
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@id", id);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+
+        return result != null;
+    }
+
+    public async Task<ClientTrip> CreateClientTripByIdAsync(int idClient, int idTrip)
+    {
+        if (!await ClientExistsAsync(idClient))
+            throw new NotFoundException($"Client with id: {idClient} does not exist");
+
+        if (!await TripExistsAsync(idTrip))
+            throw new NotFoundException($"Trip with id: {idTrip} does not exist");
+
+        if (!await CheckTripLimitAsync(idTrip))
+            throw new MaxCapacityReachedException("Trip has reached maximum capacity");
+
+        await using var connection = new SqlConnection(_connectionString);
+        const string sql = @"
+        INSERT INTO Client_Trip (IdClient, IdTrip, RegisteredAt, PaymentDate)
+        VALUES (@IdClient, @IdTrip, @RegisteredAt, @PaymentDate);";
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@IdClient", idClient);
+        command.Parameters.AddWithValue("@IdTrip", idTrip);
+        command.Parameters.AddWithValue("@RegisteredAt", int.Parse(DateTime.UtcNow.ToString("yyyyMMdd")));
+        command.Parameters.AddWithValue("@PaymentDate", DBNull.Value); 
+
+        await connection.OpenAsync();
+        await command.ExecuteNonQueryAsync();
+
+        return new ClientTrip
+        {
+            ClientId = idClient,
+            TripId = idTrip,
+            RegisteredAt = int.Parse(DateTime.UtcNow.ToString("yyyyMMdd")),
+            PaymentDate = null
+        };
+    }
+
+    public async Task RemoveClientTripByIdAsync(int id, int idTrip)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        const string sql = "delete from Client_Trip where IdClient = @id and IdTrip = @idTrip";
+        await using var command2 = new SqlCommand(sql, connection);
+        command2.Parameters.AddWithValue("@id", id);
+        command2.Parameters.AddWithValue("@idTrip", idTrip);
+        await connection.OpenAsync();
+        var numOfRows = await command2.ExecuteNonQueryAsync();
+
+        if (numOfRows == 0)
+        {
+            throw new NotFoundException($"Client with id: {id} does not have trip: {idTrip}");
+        }
+    }
 }
