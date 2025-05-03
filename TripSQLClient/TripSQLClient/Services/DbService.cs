@@ -191,7 +191,7 @@ public class DbService(IConfiguration config) : IDbService
             throw new NotFoundException($"Trip with id: {idTrip} does not exist");
 
         if (!await CheckTripLimitAsync(idTrip))
-            throw new MaxCapacityReachedException("Trip has reached maximum capacity");
+            throw new MaxCapacityReachedException($"Trip: {idTrip} has reached maximum capacity");
 
         await using var connection = new SqlConnection(_connectionString);
         // Zapytanie SQL do zapisania klienta na wycieczkę
