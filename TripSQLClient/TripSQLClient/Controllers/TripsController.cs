@@ -8,9 +8,10 @@ namespace TripSQLClient.Controllers;
 public class TripsController(IDbService dbService) : ControllerBase
 {
 
+    // Endpoint zwracający wszystkie wycieczki
     [HttpGet]
     public async Task<IActionResult> GetAllTrips()
     {
-        return Ok(await dbService.GetTripsDetailsAsync());
+        return Ok(await dbService.GetTripsDetailsAsync()); // Zwracamy wszystkie wycieczki z bazy
     }
 }

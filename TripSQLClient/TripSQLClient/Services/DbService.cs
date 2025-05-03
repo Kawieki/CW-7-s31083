@@ -23,6 +23,7 @@ public class DbService(IConfiguration config) : IDbService
     {
         var result = new List<CountryTripGetDTO>();
         
+        // Zapytanie SQL pobierające wszystkie wycieczki z informacjami o kraju, nazwie i maksymalnej liczbie uczestników
         await using var connection = new SqlConnection(_connectionString);
         const string sql = @"SELECT 
                             t.IdTrip, 
@@ -53,14 +54,15 @@ public class DbService(IConfiguration config) : IDbService
             });
         }
 
-        return result;
+        return result; // Zwracamy listę wszystkich wycieczek
     }
-
+    
     public async Task<IEnumerable<ClientTripDTO>> GetClientTripsDetailsByIdAsync(int id)
     {
         var result = new List<ClientTripDTO>();
-
         await using var connection = new SqlConnection(_connectionString);
+        
+        // Zapytanie SQL pobierające wszystkie wycieczki powiązane z danym klientem.
         const string sql = @"SELECT
                         t.Name,
                         t.Description,
@@ -99,12 +101,14 @@ public class DbService(IConfiguration config) : IDbService
             });
         }
 
-        return result;
+        return result; // zwracamy listę wycieczek dla danego klienta
     }
 
     public async Task<Client> CreateClientAsync(ClientCreateDTO client)
     {
         await using var connection = new SqlConnection(_connectionString);
+        
+        //Zapytanie SQL tworzące nowego klienta
         const string sql = "insert into Client (FirstName, LastName, Email, Telephone, Pesel) values (@FirstName, @LastName, @Email, @Telephone, @Pesel); Select scope_identity()";
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@FirstName", client.FirstName);
@@ -124,12 +128,13 @@ public class DbService(IConfiguration config) : IDbService
             Email = client.Email,
             Telephone = client.Telephone,
             Pesel = client.Pesel
-        };
+        }; // zwracamy nowo utworzonego klienta
     }
     
     private async Task<bool> ClientExistsAsync(int id)
     {
         await using var connection = new SqlConnection(_connectionString);
+        //Zapytanie SQL ktore sprawdza czy dany klient istnieje w bazie danych
         const string sql = "SELECT 1 FROM Client WHERE IdClient = @id";
 
         await using var command = new SqlCommand(sql, connection);
@@ -138,12 +143,13 @@ public class DbService(IConfiguration config) : IDbService
         await connection.OpenAsync();
         var result = await command.ExecuteScalarAsync();
 
-        return result != null;
+        return result != null; //zwracamy wartosc logiczna ktora informuje o istnieniu klienta (true), lub nie istnieniu (false)
     }
 
     private async Task<bool> TripExistsAsync(int id)
     {
         await using var connection = new SqlConnection(_connectionString);
+        //Zapytanie SQL ktore sprawdza czy dana wycieczka istnieje w bazie danych
         const string sql = "SELECT 1 FROM Trip WHERE IdTrip = @id";
 
         await using var command = new SqlCommand(sql, connection);
@@ -152,12 +158,14 @@ public class DbService(IConfiguration config) : IDbService
         await connection.OpenAsync();
         var result = await command.ExecuteScalarAsync();
 
-        return result != null;
+        return result != null; //zwracamy wartosc logiczna ktora informuje o istnieniu wycieczki (true), lub nie istnieniu (false)
     }
 
     private async Task<bool> CheckTripLimitAsync(int id)
     {
         await using var connection = new SqlConnection(_connectionString);
+        
+        //Zapytanie SQL ktore sprawdza czy na dana wycieczke jest możlwiość przypisana klienta (czy limit osób nie bedzie przekroczony)
         const string sql = @"SELECT COUNT(ct.IdTrip) 
                              FROM Client_Trip ct 
                              INNER JOIN Trip t ON ct.IdTrip = t.IdTrip
@@ -171,7 +179,7 @@ public class DbService(IConfiguration config) : IDbService
         await connection.OpenAsync();
         var result = await command.ExecuteScalarAsync();
 
-        return result != null;
+        return result != null;  //zwracamy wartosc logiczna ktora informuje o nieprzekroczeniu limitu osob (true), lub przekroczeniu (false)
     }
 
     public async Task<ClientTrip> CreateClientTripByIdAsync(int idClient, int idTrip)
@@ -186,6 +194,7 @@ public class DbService(IConfiguration config) : IDbService
             throw new MaxCapacityReachedException("Trip has reached maximum capacity");
 
         await using var connection = new SqlConnection(_connectionString);
+        // Zapytanie SQL do zapisania klienta na wycieczkę
         const string sql = @"
         INSERT INTO Client_Trip (IdClient, IdTrip, RegisteredAt, PaymentDate)
         VALUES (@IdClient, @IdTrip, @RegisteredAt, @PaymentDate);";
@@ -205,12 +214,13 @@ public class DbService(IConfiguration config) : IDbService
             TripId = idTrip,
             RegisteredAt = int.Parse(DateTime.UtcNow.ToString("yyyyMMdd")),
             PaymentDate = null
-        };
+        }; //zwracamy nowo przypisana wycieczke dla klienta
     }
 
     public async Task RemoveClientTripByIdAsync(int id, int idTrip)
     {
         await using var connection = new SqlConnection(_connectionString);
+        //Zapytanie SQL które usuwa podana wycieczke podanemu klientowi
         const string sql = "delete from Client_Trip where IdClient = @id and IdTrip = @idTrip";
         await using var command2 = new SqlCommand(sql, connection);
         command2.Parameters.AddWithValue("@id", id);
